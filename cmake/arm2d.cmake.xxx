@@ -1,0 +1,26 @@
+# cmake/arm2d.cmake
+# ARM-2D 配置
+
+# ARM-2D 基础路径
+set(ARM_2D_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../ARM-2D)
+
+# 设置 ARM-2D 的编译选项
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ARM2D_OPT_LEVEL "-O0 -g3")
+    add_compile_definitions(
+        __ARM_2D_CFG_ENABLE_HEAP_DEBUG__
+        __ARM_2D_CFG_ENABLE_CONTAINER_DEBUG__
+    )
+else()
+    set(ARM2D_OPT_LEVEL "-Oz -g0 -flto")
+    add_compile_definitions(
+        __ARM_2D_CFG_OPTIMIZE_FOR_SIZE__
+    )
+endif()
+
+# 为 ARM-2D 文件单独设置优化级别
+function(set_arm2d_optimization SOURCE_FILE)
+    set_source_files_properties(${SOURCE_FILE} PROPERTIES
+        COMPILE_FLAGS ${ARM2D_OPT_LEVEL}
+    )
+endfunction()

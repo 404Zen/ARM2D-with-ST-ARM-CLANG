@@ -1,0 +1,6 @@
+[submodule "Arm-2D"]
+	path = Arm-2D
+	url = git@github.com:ARM-software/Arm-2D.git
+[submodule "perf_counter"]
+	path = perf_counter
+	url = git@github.com:GorgonMeducer/perf_counter.git
