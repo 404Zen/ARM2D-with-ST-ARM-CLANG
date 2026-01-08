@@ -76,7 +76,6 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
-    User/lcd.c
     User/LCD_1in3.c
     Arm-2D_Port/adapter/arm_2d_disp_adapter_0.c
 )

@@ -21,7 +21,7 @@
 #include "spi.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "arm_2d_disp_adapter_0.h"
 /* USER CODE END 0 */
 
 SPI_HandleTypeDef hspi1;
@@ -138,6 +138,7 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
 }
 
 /* USER CODE BEGIN 1 */
+
 void SPI1_WriteData(uint8_t *data, uint16_t len)
 {
   HAL_SPI_Transmit(&hspi1, (uint8_t *)data, (uint16_t)len, HAL_MAX_DELAY);

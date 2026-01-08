@@ -203,6 +203,7 @@ int main(void)
 
   perfc_init(true);
   LCD_1IN3_Init(VERTICAL);
+  LCD_1IN3_Clear(0xFFFF);
 
   /* USER CODE END 2 */
 

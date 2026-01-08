@@ -19,9 +19,13 @@
 
 #include <stdlib.h>     //itoa()
 #include <stdio.h>
+#include <stdbool.h>
 
 #include "main.h"       // STM32 HAL Library
 #include "spi.h"
+
+#include "arm_2d.h"
+#include "arm_2d_helper_shape.h"
 
 #define LCD_1IN3_HEIGHT 240
 #define LCD_1IN3_WIDTH 240
@@ -72,5 +76,6 @@ void LCD_1IN3_DisplayPoint(uint16_t X, uint16_t Y, uint16_t Color);
 
 
 void Disp0_DrawBitmap(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t *bitmap);
+// void __disp_adapter0_request_async_flushing(void *pTarget, bool bIsNewFrame, int16_t iX, int16_t iY, int16_t iWidth, int16_t iHeight, const COLOUR_INT *pBuffer);
 // void Disp0_DrawBitmap_Test(void);       
 #endif

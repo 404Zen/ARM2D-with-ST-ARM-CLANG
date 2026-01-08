@@ -18,6 +18,10 @@
 #include <stdlib.h>		//itoa()
 #include <stdio.h>
 
+#include "arm_2d_disp_adapter_0.h"
+#include "perf_counter.h"
+#include "stm32g4xx_hal.h"
+
 LCD_1IN3_ATTRIBUTES LCD_1IN3;
 
 static void DEV_SPI_WriteByte(uint8_t data)
@@ -162,6 +166,18 @@ static void LCD_1IN3_InitReg(void)
     LCD_1IN3_SendData_8Bit(0x20);
     LCD_1IN3_SendData_8Bit(0x23);
 
+    LCD_1IN3_SendCommand(0x2A);  /* Column Address Set */  
+    LCD_1IN3_SendData_8Bit(0x00);  
+    LCD_1IN3_SendData_8Bit(0x00);  
+    LCD_1IN3_SendData_8Bit(0x01);  
+    LCD_1IN3_SendData_8Bit(0xEF);  /* 319 */  
+    
+    LCD_1IN3_SendCommand(0x2B);  /* Row Address Set */  
+    LCD_1IN3_SendData_8Bit(0x00);  
+    LCD_1IN3_SendData_8Bit(0x00);  
+    LCD_1IN3_SendData_8Bit(0x00);  
+    LCD_1IN3_SendData_8Bit(0xEF);  /* 239 */
+
     LCD_1IN3_SendCommand(0x21);  //Display Inversion On
 
     LCD_1IN3_SendCommand(0x11);  //Sleep Out
@@ -242,6 +258,26 @@ void LCD_1IN3_SetWindows(uint16_t Xstart, uint16_t Ystart, uint16_t Xend, uint16
     // printf("%d %d\r\n",x,y);
 }
 
+void LCD_1IN3_SetWindowsDMA(uint16_t Xstart, uint16_t Ystart, uint16_t Xend, uint16_t Yend)
+{
+    //set the X coordinates
+    LCD_1IN3_SendCommand(0x2A);
+    LCD_1IN3_SendData_8Bit(0x00);
+    LCD_1IN3_SendData_8Bit(Xstart);
+	LCD_1IN3_SendData_8Bit(0x00);
+    LCD_1IN3_SendData_8Bit(Xend-1);
+
+    //set the Y coordinates
+    LCD_1IN3_SendCommand(0x2B);
+    LCD_1IN3_SendData_8Bit(0x00);
+	LCD_1IN3_SendData_8Bit(Ystart);
+	LCD_1IN3_SendData_8Bit(0x00);
+    LCD_1IN3_SendData_8Bit(Ystart + Yend-1);
+
+    LCD_1IN3_SendCommand(0X2C);
+    // printf("%d %d\r\n",x,y);
+}
+
 /******************************************************************************
 function :	Clear screen
 parameter:
@@ -308,6 +344,72 @@ void Disp0_DrawBitmap(  int16_t x,
                         const uint8_t *bitmap)
 {
     GLCD_DrawBitmap(x, y, width, height, (uint16_t *)bitmap);
+}
+
+volatile uint8_t sending_cmd = 0;
+// extern SPI_HandleTypeDef hspi1;      // SPI 句柄  
+// extern DMA_HandleTypeDef hdma_spi1_tx; // DMA 句柄  
+void __disp_adapter0_request_async_flushing(   
+    void *pTarget,  
+    bool bIsNewFrame,  
+    int16_t iX,   
+    int16_t iY,  
+    int16_t iWidth,  
+    int16_t iHeight,  
+    const COLOUR_INT *pBuffer)  
+{  
+    HAL_StatusTypeDef status;    
+    uint32_t dataSize = (uint32_t)iWidth * iHeight * sizeof(COLOUR_INT);   
+      
+    if (NULL == pBuffer || 0 == dataSize) {    
+        return;    
+    }    
+         
+    /* 发送列地址命令 */    
+    sending_cmd = 1;
+    LCD_1IN3_SetWindows(iX, iY, iX+iWidth, iY + iHeight);
+    while(HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY);
+    sending_cmd = 0;
+
+    /* 启动 DMA 传输 */    
+    DEV_Digital_Write(EPD_DC_PIN, 1);
+    DEV_Digital_Write(EPD_CS_PIN, 0);    
+    status = HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)pBuffer, dataSize);    
+        
+    if (HAL_OK != status) {    
+        DEV_Digital_Write(EPD_CS_PIN, 1);  
+        disp_adapter0_insert_async_flushing_complete_event_handler();    
+    }  
+}
+
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  if(hspi->Instance == SPI1)
+  {
+    DEV_Digital_Write(EPD_CS_PIN, 1);
+    // 通知 Arm-2D DMA 传输完成  
+    if(sending_cmd == 1)
+    {
+        sending_cmd = 255;
+    }
+    else 
+    {
+        disp_adapter0_insert_async_flushing_complete_event_handler();  
+    }
+    
+  }
+}
+
+/* DMA 传输错误中断回调函数 */  
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)  
+{  
+    if (hspi == &hspi1) {  
+        /* 错误处理，恢复 CS 信号 */  
+        DEV_Digital_Write(EPD_CS_PIN, 1);
+          
+        /* 通知 Arm-2D 传输完成（错误情况） */  
+        disp_adapter0_insert_async_flushing_complete_event_handler();  
+    }  
 }
 #if 0
 void Disp0_DrawBitmap_Test(void)
