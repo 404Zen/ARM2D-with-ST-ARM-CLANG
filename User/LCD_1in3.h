@@ -34,6 +34,22 @@
 #define HORIZONTAL 0
 #define VERTICAL   1
 
+#define DMA_ASYNC_FLUSHING 1
+
+typedef struct 
+{
+    void *pTarget;
+    bool bIsNewFrame;
+    int16_t iX;   
+    int16_t iY;  
+    int16_t iWidth;  
+    int16_t iHeight;  
+    const COLOUR_INT *pBuffer;
+
+    uint8_t async_flushing_step;
+}ARM2D_ASYNC_FLUSHING_DATA;
+extern ARM2D_ASYNC_FLUSHING_DATA adapter0_async_flushing_data;
+
 #define LCD_1IN3_SetBacklight(Value) ; 
 
 
@@ -73,9 +89,6 @@ void LCD_1IN3_Display(uint16_t *Image);
 void LCD_1IN3_DisplayWindows(uint16_t Xstart, uint16_t Ystart, uint16_t Xend, uint16_t Yend, uint16_t *Image);
 void LCD_1IN3_DisplayPoint(uint16_t X, uint16_t Y, uint16_t Color);
 
-
-
 void Disp0_DrawBitmap(int16_t x, int16_t y, int16_t width, int16_t height, const uint8_t *bitmap);
-// void __disp_adapter0_request_async_flushing(void *pTarget, bool bIsNewFrame, int16_t iX, int16_t iY, int16_t iWidth, int16_t iHeight, const COLOUR_INT *pBuffer);
-// void Disp0_DrawBitmap_Test(void);       
+void arm2d_async_flushing_loop(ARM2D_ASYNC_FLUSHING_DATA *data);  
 #endif

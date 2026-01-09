@@ -60,65 +60,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-// static  
-// IMPL_PFB_ON_DRAW(__pfb_draw_handler)  
-// {  
-//     arm_2d_canvas(ptTile, __top_container) {  
-//         arm_2d_fill_colour(ptTile, NULL, GLCD_COLOR_WHITE);  
-          
-//         arm_2d_align_centre(__top_container, 100, 100) {  
-//             arm_2d_fill_colour(ptTile, &__centre_region, GLCD_COLOR_BLUE);  
-//         }  
-//     }  
-      
-//     arm_2d_op_wait_async(NULL);  
-//     return arm_fsm_rt_cpl;  
-// }  
-  
-static  
-IMPL_PFB_ON_DRAW(__pfb_draw_handler)  
-{  
-    arm_2d_canvas(ptTile, __top_container) {  
-        arm_2d_fill_colour(ptTile, NULL, GLCD_COLOR_WHITE);  
-          
-        // 显示转圈动画  
-        busy_wheel2_show(ptTile, bIsNewFrame);  
-    }  
-      
-    arm_2d_op_wait_async(NULL);  
-    return arm_fsm_rt_cpl;  
-}
-
-arm_2d_scene_t *ptScenes[] = {  
-    &(arm_2d_scene_t){  
-        .fnScene = __pfb_draw_handler,  
-        .tCanvas = GLCD_COLOR_WHITE,  
-        
-    },  
-};
-
-// 确保所有必要的函数指针都已设置  
-arm_2d_scene_t my_scene = {  
-    .fnScene = &__pfb_draw_handler,      // 必须设置  
-    .fnOnFrameStart = NULL,           // 可选  
-    .fnOnFrameCPL = NULL,             // 可选  
-    .tCanvas = GLCD_COLOR_WHITE,      // 背景色  
-    .bUseDirtyRegionHelper = false,   // 根据需要设置  
-};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-// uint64_t arm_2d_helper_get_system_timestamp(void)  
-// {  
-//     return get_system_ticks();  
-// }  
-  
-// uint32_t arm_2d_helper_get_reference_clock_frequency(void)  
-// {  
-//     return SystemCoreClock;  
-// }
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -192,9 +138,6 @@ int main(void)
   MX_DMA_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-
-  
-
   
   if(check_dwt_enabled() ==  false)
   {
@@ -204,7 +147,7 @@ int main(void)
   perfc_init(true);
   LCD_1IN3_Init(VERTICAL);
   LCD_1IN3_Clear(0xFFFF);
-
+  adapter0_async_flushing_data.async_flushing_step = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -220,25 +163,28 @@ int main(void)
   {
     arm_2d_init();
   }
-  // arm_lcd_text_init();
-  // arm_2d_helper_init();
   /* initialize the display adapter 0 service */
   disp_adapter0_init();
   
-  // extern arm_2d_scene_t *ptScenes[];  
-    // arm_2d_scene_player_append_scenes(&DISP0_ADAPTER, &my_scene, 1);  
   start_tick = HAL_GetTick();
-
-  // arm_lcd_text_location(0, 0);  
-  // arm_lcd_printf("TEST NAV");  // 强制显示测试文本
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // int32_t iCycleResult = 0;
+#if DMA_ASYNC_FLUSHING
+    if(adapter0_async_flushing_data.async_flushing_step == 0) //  || adapter0_async_flushing_data.async_flushing_step == 6)
+    {
+      tResult = disp_adapter0_task();
+    }
+    else
+    {
+      arm2d_async_flushing_loop(&adapter0_async_flushing_data);
+    }
+#else
     tResult = disp_adapter0_task();
+#endif
     if(HAL_GetTick() - start_tick >= 500)
     {
       start_tick = HAL_GetTick();

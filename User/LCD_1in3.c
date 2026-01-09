@@ -23,6 +23,7 @@
 #include "stm32g4xx_hal.h"
 
 LCD_1IN3_ATTRIBUTES LCD_1IN3;
+ARM2D_ASYNC_FLUSHING_DATA adapter0_async_flushing_data;
 
 static void DEV_SPI_WriteByte(uint8_t data)
 {
@@ -347,8 +348,11 @@ void Disp0_DrawBitmap(  int16_t x,
 }
 
 volatile uint8_t sending_cmd = 0;
-// extern SPI_HandleTypeDef hspi1;      // SPI 句柄  
-// extern DMA_HandleTypeDef hdma_spi1_tx; // DMA 句柄  
+
+
+
+
+
 void __disp_adapter0_request_async_flushing(   
     void *pTarget,  
     bool bIsNewFrame,  
@@ -358,6 +362,26 @@ void __disp_adapter0_request_async_flushing(
     int16_t iHeight,  
     const COLOUR_INT *pBuffer)  
 {  
+#if DMA_ASYNC_FLUSHING
+    if(adapter0_async_flushing_data.async_flushing_step == 0)
+    {
+        
+        adapter0_async_flushing_data.pTarget = pTarget;
+        adapter0_async_flushing_data.bIsNewFrame = bIsNewFrame;
+        adapter0_async_flushing_data.iX = iX;
+        adapter0_async_flushing_data.iY = iY;
+        adapter0_async_flushing_data.iWidth = iWidth;
+        adapter0_async_flushing_data.iHeight = iHeight;
+        adapter0_async_flushing_data.pBuffer = pBuffer;
+
+        LCD_1IN3_SendCommand(0x2A);
+        adapter0_async_flushing_data.async_flushing_step = 2;
+    }
+    else 
+    {
+        // adapter0_async_flushing_data.async_flushing_step = 255;
+    }
+#else
     HAL_StatusTypeDef status;    
     uint32_t dataSize = (uint32_t)iWidth * iHeight * sizeof(COLOUR_INT);   
       
@@ -379,7 +403,86 @@ void __disp_adapter0_request_async_flushing(
     if (HAL_OK != status) {    
         DEV_Digital_Write(EPD_CS_PIN, 1);  
         disp_adapter0_insert_async_flushing_complete_event_handler();    
-    }  
+    }
+#endif  
+}
+
+volatile uint8_t data_buf[4] = {0};
+void arm2d_async_flushing_loop(ARM2D_ASYNC_FLUSHING_DATA *data)
+{
+    HAL_StatusTypeDef status;
+    uint32_t dataSize = (uint32_t)data->iWidth * data->iHeight * sizeof(COLOUR_INT);   
+
+    if(data->async_flushing_step == 0)
+    {
+        return;
+    }
+    
+    if (NULL == data->pBuffer || 0 == dataSize) 
+    {    
+        data->async_flushing_step = 0xE0;
+        return;    
+    } 
+
+    if(HAL_SPI_GetState(&hspi1) != HAL_SPI_STATE_READY)
+    {
+        return;
+    }
+    switch (data->async_flushing_step) 
+    {
+        case 1:
+            LCD_1IN3_SendCommand(0x2A);
+            data->async_flushing_step = 2;
+        break;
+
+        case 2:
+            data_buf[0] = 0x00;
+            data_buf[1] = data->iX;
+            data_buf[2] = 0x00;
+            data_buf[3] = data->iX + data->iWidth - 1;
+            DEV_Digital_Write(EPD_DC_PIN, 1);
+            DEV_Digital_Write(EPD_CS_PIN, 0);
+            HAL_SPI_Transmit(&hspi1, (uint8_t *)data_buf, 4, HAL_MAX_DELAY);
+            data->async_flushing_step = 3;
+        break;
+
+        case 3:
+            LCD_1IN3_SendCommand(0x2B);
+            data->async_flushing_step = 4;
+        break;
+
+        case 4:
+            data_buf[0] = 0x00;
+            data_buf[1] = data->iY;
+            data_buf[2] = 0x00;
+            data_buf[3] = data->iY + data->iHeight - 1;
+
+            DEV_Digital_Write(EPD_DC_PIN, 1);
+            DEV_Digital_Write(EPD_CS_PIN, 0);
+            HAL_SPI_Transmit(&hspi1, (uint8_t *)data_buf, 4, HAL_MAX_DELAY);
+            data->async_flushing_step = 5;
+        break;
+
+        case 5:
+            LCD_1IN3_SendCommand(0x2C);
+            data->async_flushing_step = 6;
+        break;
+
+        case 6:
+            DEV_Digital_Write(EPD_DC_PIN, 1);
+            DEV_Digital_Write(EPD_CS_PIN, 0);
+            status = HAL_SPI_Transmit_DMA(&hspi1, (uint8_t *)data->pBuffer, dataSize);    
+        
+            if (HAL_OK != status) {    
+                DEV_Digital_Write(EPD_CS_PIN, 1);  
+                disp_adapter0_insert_async_flushing_complete_event_handler();    
+            }
+            data->async_flushing_step = 0;
+        break;
+
+        default:
+            break;
+    }
 }
 
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)

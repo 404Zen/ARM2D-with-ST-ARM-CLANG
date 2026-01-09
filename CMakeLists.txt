@@ -57,12 +57,21 @@ set(CMSISCORE "${CMAKE_SOURCE_DIR}/Drivers/CMSIS" CACHE STRING "Path to CMSIS Co
 # set(CMSISCORE "${CMAKE_SOURCE_DIR}/Drivers/CMSIS" CACHE STRING "Path to CMSIS Core" FORCE)
 add_compile_definitions(__PERF_COUNTER__)  
 
-# 然后添加ARM-2D的子目录
-add_subdirectory(Arm-2D)
-add_subdirectory(cmake/perf_counter)
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+# 然后添加ARM-2D的子目录
+add_subdirectory(cmake/perf_counter)
+add_subdirectory(cmake/arm2d)
 
+# 移除 ARM2D 可能继承的全局优化标志，然后设置特定优化
+# set_target_properties(ARM2D PROPERTIES COMPILE_OPTIONS "")
+
+# 设置 ARM2D 特定的优化等级
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(ARM2D PRIVATE -O3 -ffast-math -g0)
+else()
+    target_compile_options(ARM2D PRIVATE -O3)
+endif()
 
 # 在添加了 Arm-2D 子目录后，让其链接此接口库
 target_link_libraries(ARM2D PUBLIC arm2d_includes)
